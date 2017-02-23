@@ -31,6 +31,18 @@ export CLUSTER_VM_CPUs=${CLUSTER_VM_CPUs-1}
 export CLUSTER_VM_EFI=${CLUSTER_VM_EFI:-false}
 export CLUSTER_VM_DRIVE_SIZE=${CLUSTER_VM_DRIVE_SIZE-20480}
 
+# Prefix a name to the cluster for running multiple tests per machine
+
+# Gather override_attribute bcpc/cluster_name or an empty string
+environments=( ./environments/*.json )
+if (( ${#environments[*]} > 1 )); then
+  echo 'Need one and only one environment in environments/*.json; got: ' \
+       "${environments[*]}" >&2
+  exit 1
+fi
+python_to_find_cluster_name="import json; j = json.load(file('${environments[0]}')); print j['override_attributes']['bcpc'].get('cluster_name','')"
+export CLUSTER_NAME=$(python -c "$python_to_find_cluster_name")
+
 # The root drive on cluster nodes must allow for a RAM-sized swap volume.
 CLUSTER_VM_ROOT_DRIVE_SIZE=$((CLUSTER_VM_DRIVE_SIZE + CLUSTER_VM_MEM - 2048))
 
@@ -39,9 +51,12 @@ VBOX_DIR="`dirname ${BASH_SOURCE[0]}`/vbox"
 P=`python -c "import os.path; print os.path.abspath(\"${VBOX_DIR}/\")"`
 
 if [ "$CLUSTER_TYPE" == "Kafka" ]; then
-  VM_LIST=(bcpc-vm1 bcpc-vm2 bcpc-vm3 bcpc-vm4 bcpc-vm5 bcpc-vm6)
+  export VM_LIST=(${CLUSTER_NAME}bcpc-vm1 ${CLUSTER_NAME}bcpc-vm2
+                  ${CLUSTER_NAME}bcpc-vm3 ${CLUSTER_NAME}bcpc-vm4
+                  ${CLUSTER_NAME}bcpc-vm5 ${CLUSTER_NAME}bcpc-vm6)
 else
-  VM_LIST=(bcpc-vm1 bcpc-vm2 bcpc-vm3)
+  export VM_LIST=(${CLUSTER_NAME}bcpc-vm1 ${CLUSTER_NAME}bcpc-vm2
+                  ${CLUSTER_NAME}bcpc-vm3)
 fi
 
 ######################################################
@@ -67,6 +82,28 @@ function download_VM_files {
 }
 
 ################################################################################
+# Function to enumerate VirtualBox hostonly interfaces
+# in use from VM's.
+# Argument: name of an associative array defined in calling context
+# Post-Condition: Updates associative array provided by name with keys being
+#                 all interfaces in use and values being the number of VMs on
+#                 each network
+function discover_VBOX_hostonly_ifs {
+  local -n used_ifs
+  for net in $($VBM list hostonlyifs | grep '^Name:' | sed 's/^Name:[ ]*//'); do
+    used_ifs[$net] = 0
+  done
+  for vm in $($VBM list vms | sed -e 's/^[^{]*{//' -e 's/}$//'); do
+    ifs=$($VBM showvminfo --machinereadable $vm | \
+      egrep '^hostonlyadapter[0-9]*' | \
+      sed -e 's/^hostonlyadapter[0-9]*="//' -e 's/"$//')
+    for interface in ifs; do
+      used_ifs[$interface] = $((${used_ifs[$interface]} + 1))
+    done
+  done
+}
+
+################################################################################
 # Function to remove VirtualBox DHCP servers
 # By default, checks for any DHCP server on networks without VM's & removes them
 # (expecting if a remove fails the function should bail)
@@ -76,9 +113,9 @@ function download_VM_files {
 function remove_DHCPservers {
   local network_name=${1-}
   if [[ -z "$network_name" ]]; then
-    local vms=$(vboxmanage list vms|sed 's/^.*{\([0-9a-f-]*\)}/\1/')
+    local vms=$($VBM list vms|sed 's/^.*{\([0-9a-f-]*\)}/\1/')
     # will produce a list of networks like ^vboxnet0$|^vboxnet1$ which are in use by VMs
-    local existing_nets_reg_ex=$(sed -e 's/^/^/' -e '/$/$/' -e 's/ /$|^/g' <<< $(for vm in $vms; do vboxmanage showvminfo --details --machinereadable $vm | grep -i 'adapter[2-9]=' | sed -e 's/^.*=//' -e 's/"//g'; done | sort -u))
+    local existing_nets_reg_ex=$(sed -e 's/^/^/' -e '/$/$/' -e 's/ /$|^/g' <<< $(for vm in $vms; do $VBM showvminfo --details --machinereadable $vm | grep -i 'adapter[2-9]=' | sed -e 's/^.*=//' -e 's/"//g'; done | sort -u))
 
     $VBM list dhcpservers | grep -E "^NetworkName:\s+HostInterfaceNetworking" | sed 's/^.*-//' |
     while read -r network_name; do
@@ -116,33 +153,63 @@ function create_bootstrap_VM {
     vagrant up --provision
   else
     echo "Vagrant not detected - using raw VirtualBox for bcpc-bootstrap"
-    # Make the three BCPC networks we'll need, but clear all nets and dhcpservers first
-    for i in 0 1 2 3 4 5 6 7 8 9; do
-      if [[ ! -z `$VBM list hostonlyifs | grep vboxnet$i | cut -f2 -d" "` ]]; then
-        $VBM hostonlyif remove vboxnet$i || true
-      fi
+    # Make the three BCPC networks we'll need, but clear all nets and dhcpservers first (if the network has no VMs attached)
+    define -A host_only_ifs
+    discover_VBOX_hostonly_ifs host_only_ifs
+    for interface in ${!host_only_ifs[@]}; do
+      (( ${host_only_ifs[$interface]} < 1 )) && \
+        $VBM hostonlyif remove $interface || true
     done
 
+    # re-enumerate interfaces after cleaning unused interfaces
+    define -A pre_creation_host_only_ifs
+    discover_VBOX_hostonly_ifs pre_creation_host_only_ifs
+
     $VBM hostonlyif create
     $VBM hostonlyif create
     $VBM hostonlyif create
 
-    remove_DHCPservers vboxnet0 || true
-    remove_DHCPservers vboxnet1 || true
-    remove_DHCPservers vboxnet2 || true
-    # use variable names to refer to our three interfaces to disturb
-    # the remaining code that refers to these as little as possible -
-    # the names are compact on Unix :
-    VBN0=vboxnet0
-    VBN1=vboxnet1
-    VBN2=vboxnet2
+    # re-enumerate interfaces after creating new interfaces
+    define -A post_creation_host_only_ifs
+    discover_VBOX_hostonly_ifs post_creation_host_only_ifs
+
+    # produce a new-line separated string of new interface names
+    # --new-line-format needs a newline in its argument for this to work
+    new_ifs=$(diff --old-line-format='' \
+      --unchanged-line-format='' \
+      --new-line-format='%l|
+' \
+      <(for i in ${!pre_creation_host_only_ifs[@]}; do echo $i; done) \
+      <(for i in ${!post_creation_host_only_ifs[@]}; do echo $i; done))
+
+    # Remove DHCP server for each interface and set $VBN0, $VBN1, $VBN2
+    # for use in configuring networks; variables refer to our three interfaces
+    # to disturb the remaining code that refers to these as little as possible -
+    # the names are compact
+    i=0
+    for net in $new_ifs; do
+      remove_DHCPservers $net || true
+
+      # here we assign net_var to be a name standin for $VBN0,1,2...
+      local -n net_var=VBN$i
+      net_var=$net
+
+      i=$((i+1))
+    done
+
+    # make sure we only found three new networks!
+    if (( $i != 2 )); then
+      echo 'Did not find three new networks after creating new VirtualBox' \
+       "networks: $new_ifs"
+      exit 1
+    fi
 
     $VBM hostonlyif ipconfig "$VBN0" --ip 10.0.100.2    --netmask 255.255.255.0
     $VBM hostonlyif ipconfig "$VBN1" --ip 172.16.100.2  --netmask 255.255.255.0
     $VBM hostonlyif ipconfig "$VBN2" --ip 192.168.100.2 --netmask 255.255.255.0
 
     # Create bootstrap VM
-    for vm in bcpc-bootstrap; do
+    for vm in ${CLUSTER_NAME}bcpc-bootstrap; do
       # Only if VM doesn't exist
       if ! $VBM list vms | grep "^\"${vm}\"" ; then
           $VBM createvm --name $vm --ostype Ubuntu_64 --basefolder $P --register
@@ -181,10 +248,11 @@ function create_cluster_VMs {
   # Gather VirtualBox networks in use by bootstrap VM
   oifs="$IFS"
   IFS=$'\n'
-  bootstrap_interfaces=($($VBM showvminfo bcpc-bootstrap --machinereadable | \
-				 egrep '^hostonlyadapter[0-9]=' | \
-				 sort | \
-				 sed -e 's/.*=//' -e 's/"//g'))
+  bootstrap_interfaces=($($VBM showvminfo ${CLUSTER_NAME}bcpc-bootstrap \
+    --machinereadable | \
+    egrep '^hostonlyadapter[0-9]=' | \
+    sort | \
+    sed -e 's/.*=//' -e 's/"//g'))
   IFS="$oifs"
   VBN0="${bootstrap_interfaces[0]}"
   VBN1="${bootstrap_interfaces[1]}"
