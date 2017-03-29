@@ -3,10 +3,6 @@
 # bash imports
 source ./virtualbox_env.sh
 
-if [[ "$OSTYPE" == msys || "$OSTYPE" == cygwin ]]; then
-  WIN=TRUE
-fi
-
 set -x
 
 if [[ -f ./proxy_setup.sh ]]; then
@@ -120,49 +116,26 @@ function create_bootstrap_VM {
     vagrant up --provision
   else
     echo "Vagrant not detected - using raw VirtualBox for bcpc-bootstrap"
-    if [[ -z "WIN" ]]; then
-      # Make the three BCPC networks we'll need, but clear all nets and dhcpservers first
-      for i in 0 1 2 3 4 5 6 7 8 9; do
-        if [[ ! -z `$VBM list hostonlyifs | grep vboxnet$i | cut -f2 -d" "` ]]; then
-          $VBM hostonlyif remove vboxnet$i || true
-        fi
-      done
-    else
-      # On Windows the first interface has no number
-      # The second interface is #2
-      # Remove in reverse to avoid substring matching issue
-      for i in 10 9 8 7 6 5 4 3 2 1; do
-        if [[ i -gt 1 ]]; then
-          IF="VirtualBox Host-Only Ethernet Adapter #$i";
-        else
-          IF="VirtualBox Host-Only Ethernet Adapter";
-        fi
-        if [[ ! -z `$VBM list hostonlyifs | grep "$IF"` ]]; then
-          $VBM hostonlyif remove "$IF"
-        fi
-      done
-    fi
+    # Make the three BCPC networks we'll need, but clear all nets and dhcpservers first
+    for i in 0 1 2 3 4 5 6 7 8 9; do
+      if [[ ! -z `$VBM list hostonlyifs | grep vboxnet$i | cut -f2 -d" "` ]]; then
+        $VBM hostonlyif remove vboxnet$i || true
+      fi
+    done
 
     $VBM hostonlyif create
     $VBM hostonlyif create
     $VBM hostonlyif create
 
-    if [[ -z "$WIN" ]]; then
-      remove_DHCPservers vboxnet0 || true
-      remove_DHCPservers vboxnet1 || true
-      remove_DHCPservers vboxnet2 || true
-      # use variable names to refer to our three interfaces to disturb
-      # the remaining code that refers to these as little as possible -
-      # the names are compact on Unix :
-      VBN0=vboxnet0
-      VBN1=vboxnet1
-      VBN2=vboxnet2
-    else
-      # However, the names are verbose on Windows :
-      VBN0="VirtualBox Host-Only Ethernet Adapter"
-      VBN1="VirtualBox Host-Only Ethernet Adapter #2"
-      VBN2="VirtualBox Host-Only Ethernet Adapter #3"
-    fi
+    remove_DHCPservers vboxnet0 || true
+    remove_DHCPservers vboxnet1 || true
+    remove_DHCPservers vboxnet2 || true
+    # use variable names to refer to our three interfaces to disturb
+    # the remaining code that refers to these as little as possible -
+    # the names are compact on Unix :
+    VBN0=vboxnet0
+    VBN1=vboxnet1
+    VBN2=vboxnet2
 
     $VBM hostonlyif ipconfig "$VBN0" --ip 10.0.100.2    --netmask 255.255.255.0
     $VBM hostonlyif ipconfig "$VBN1" --ip 172.16.100.2  --netmask 255.255.255.0
