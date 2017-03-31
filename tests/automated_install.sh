@@ -34,7 +34,9 @@ $SEDINPLACE 's/vb.gui = true/vb.gui = false/' Vagrantfile
 if hash ruby; then
   ruby ./tests/edit_environment.rb
 else
-  printf "WARN: no ruby found -- proceeding without editing environment!\n"
+  printf "#### WARNING: no ruby found -- proceeding without editing environment!\n" > /dev/stderr
+  mkdir -p ../cluster
+  cp -rv stub-environment/* ../cluster
 fi
 
 if [ "${CLUSTER_TYPE,,}" == "kafka" ]; then
@@ -70,8 +72,11 @@ else
   ( echo "############## No cluster data found in ../cluster or ./cluster.tgz! ##############" && exit 1 )
 fi
 
+python_to_find_bootstrap_ip="import json; j = json.load(file('${environments[0]}')); print j['override_attributes']['bcpc']['bootstrap']['server']"
+BOOTSTRAP_IP=$(python -c "$python_to_find_bootstrap_ip")
+
 create_cluster_VMs || ( echo "############## VBOX CREATE CLUSTER VMs RETURNED $? ##############" && exit 1 )
-install_cluster $ENVIRONMENT || ( echo "############## VBOX CREATE INSTALL CLUSTER RETURNED $? ##############" && exit 1 )
+install_cluster $ENVIRONMENT $BOOTSTRAP_IP || ( echo "############## VBOX CREATE INSTALL CLUSTER RETURNED $? ##############" && exit 1 )
 
 printf "#### Cobbler Boot\n"
 printf "Snapshotting pre-Cobbler and booting (unless already running)\n"
