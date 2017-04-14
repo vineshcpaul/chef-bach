@@ -51,9 +51,6 @@ fi
 rm -f ../cluster/kafka_cluster.txt
 rm -f ../cluster/hadoop_cluster.txt
 
-# pull back the modified environment so that it can be copied to remote host
-tar -czf cluster.tgz ../cluster
-
 printf "#### Setup VB's and Bootstrap\n"
 source ./vbox_create.sh
 
@@ -62,15 +59,6 @@ echo "Using CLUSTER_NAME=${CLUSTER_NAME} VM_LIST=${VM_LIST}"
 
 download_VM_files || ( echo "############## VBOX CREATE DOWNLOAD VM FILES RETURNED $? ##############" && exit 1 )
 create_bootstrap_VM || ( echo "############## VBOX CREATE BOOTSTRAP VM RETURNED $? ##############" && exit 1 )
-
-# Copy cluster mutable data to bootstrap.
-if [[ -d ../cluster ]]; then
-  tar -C .. -cf - cluster | vagrant ssh -c 'cd ~; tar -xvf -'
-elif [[ -f ./cluster.tgz ]]; then
-  gunzip -c cluster.tgz | vagrant ssh -c 'cd ~; tar -xvf -'
-else
-  ( echo "############## No cluster data found in ../cluster or ./cluster.tgz! ##############" && exit 1 )
-fi
 
 python_to_find_bootstrap_ip="import json; j = json.load(file('${environments[0]}')); print j['override_attributes']['bcpc']['bootstrap']['server']"
 BOOTSTRAP_IP=$(python -c "$python_to_find_bootstrap_ip")
