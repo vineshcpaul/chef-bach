@@ -307,6 +307,8 @@ function create_cluster_VMs {
           $VBM modifyvm $vm --uartmode1 server /tmp/serial-${vm}-ttyS0
       fi
   done
+  # update cluster.txt to match VirtualBox MAC's
+  ./vm-to-cluster.sh
 }
 
 ###################################################################
@@ -340,7 +342,7 @@ function install_cluster {
     echo '========= Failed to Chef!' >&2
     exit 1
   fi
-  ./enroll_cobbler.sh
+  vagrant ssh -c 'cd chef-bcpc; ./cluster-enroll-cobbler.sh add'
   popd
 }
 
