@@ -105,7 +105,7 @@ fi
 
 vagrant ssh -c "cd chef-bcpc; source proxy_setup.sh; ./wait-for-hosts.sh ${VM_LIST[*]}"
 printf "Snapshotting post-Cobbler\n"
-for vm in ${VM_LIST[*]} bcpc-bootstrap; do
+for vm in ${VM_LIST[*]} ${CLUSTER_NAME}bcpc-bootstrap; do
   [[ ! $(vboxmanage snapshot $vm list --machinereadable | grep -q 'Post-Cobble') ]] && \
     [[ "$vms_started" == "True" ]] && VBoxManage snapshot $vm take Post-Cobble --live &
 done
@@ -113,10 +113,11 @@ wait && printf "Done Snapshotting\n"
 
 printf "#### Chef the nodes with Basic role\n"
 vagrant ssh -c "cd chef-bcpc; ./cluster-assign-roles.sh $ENVIRONMENT Basic"
+
 printf "Snapshotting Post-Basic\n"
-for i in bootstrap vm1 vm2 vm3; do
-  [[ $(vboxmanage snapshot bcpc-$i list --machinereadable | grep -q 'Post-Basic') ]] && \
-    VBoxManage snapshot bcpc-$i take Post-Basic &
+for vm in ${VM_LIST[*]} ${CLUSTER_NAME}bcpc-bootstrap; do
+  [[ ! $(vboxmanage snapshot $vm list --machinereadable | grep -q 'Basic') ]] && \
+    VBoxManage snapshot $vm take Basic --live &
 done
 wait && printf "Done Snapshotting\n"
 
