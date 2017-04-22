@@ -27,6 +27,9 @@ export CLUSTER_VM_MEM=${CLUSTER_VM_MEM:-7120}
 export CLUSTER_VM_CPUs=${CLUSTER_VM_CPUs:-4}
 export CLUSTER_TYPE=${CLUSTER_TYPE:-Hadoop}
 
+# normalize capitaliztion of CLUSTER_TYPE to lower case
+typeset -l CLUSTER_TYPE="${CLUSTER_TYPE}"
+
 printf "#### Setup configuration files\n"
 # setup vagrant
 $SEDINPLACE 's/vb.gui = true/vb.gui = false/' Vagrantfile
@@ -126,7 +129,7 @@ printf "#### Chef the nodes with complete roles\n"
 printf "Cluster type: $CLUSTER_TYPE\n"
 
 
-if [ "$CLUSTER_TYPE" == "Hadoop" ]; then
+if [ "$CLUSTER_TYPE" == "hadoop" ]; then
   printf "Running C-A-R 'bootstrap' before final C-A-R"
   # https://github.com/bloomberg/chef-bach/issues/847
   # We know the first run might fail set +e
