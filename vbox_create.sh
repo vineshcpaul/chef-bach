@@ -325,7 +325,6 @@ function install_cluster {
   environment=${1-Test-Laptop}
   ip=${2-10.0.100.3}
 
-  pushd $P
   # N.B. As of Aug 2013, grub-pc gets confused and wants to prompt re: 3-way
   # merge.  Sigh.
   #vagrant ssh -c "sudo ucf -p /etc/default/grub"
@@ -349,7 +348,6 @@ function install_cluster {
     exit 1
   fi
   vagrant ssh -c 'cd chef-bcpc; ./cluster-enroll-cobbler.sh add'
-  popd
 }
 
 # only execute functions if being run and not sourced
