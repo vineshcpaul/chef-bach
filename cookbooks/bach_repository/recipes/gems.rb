@@ -79,6 +79,19 @@ ruby_block 'determine-bundler-command' do
   end
 end
 
+execute 'bundler update' do
+  cwd node['bach']['repository']['repo_directory']
+  command "#{bundler_bin} update "
+  # restore system PKG_CONFIG_PATH so mkmf::pkg_config()
+  # can find system libraries
+  environment \
+    'PKG_CONFIG_PATH' => %w(/usr/lib/pkgconfig
+                            /usr/lib/x86_64-linux-gnu/pkgconfig
+                            /usr/share/pkgconfig).join(':'),
+    'PATH' => [::File.dirname(bundler_bin), ENV['PATH']].join(':')
+  user 'vagrant'
+end
+
 execute 'bundler install' do
   cwd node['bach']['repository']['repo_directory']
   command lazy { node.run_state[:bcpc_bootstrap_bundler_command] }
