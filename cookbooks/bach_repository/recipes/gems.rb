@@ -60,12 +60,9 @@ ruby_block 'determine-bundler-command' do
   block do
     gemfile_lock_path = File.join(node['bach']['repository']['repo_directory'],
                           'Gemfile.lock')
-    gemfile_lock_cmd = Mixlib::ShellOut.new('git', 'diff', '--name-status',
-                                            gemfile_lock_path)
-    gemfile_lock_cmd.run_command
-    if File.exists?(gemfile_lock_path) && !gemfile_lock_cmd.error?
+    if File.exists?(gemfile_lock_path) 
       node.run_state[:bcpc_bootstrap_bundler_command] =
-        "#{bundler_bin} install --deployment"
+        "rm -f #{gemfile_lock_path} && #{bundler_bin} --no-deployment && #{bundler_bin} --deployment"
     else
       node.run_state[:bcpc_bootstrap_bundler_command] =
         "#{bundler_bin} install"
