@@ -17,24 +17,7 @@
 # limitations under the License.
 #
 
-gem_path = Pathname.new(Gem.ruby).dirname.join('gem').to_s
-rewind_version = '0.0.9'
-
-#
-# Move to installing chef-rewind via execute block to work around
-# issue where version string is empty when combining gem_binary,
-# version and options in the gem_package resource
-#
-execute 'gem_install_chef-rewind' do
-  command gem_path + ' install chef-rewind -q --no-rdoc --no-ri -v "' \
-    + rewind_version + "\" --clear-sources -s #{get_binary_server_url}"
-  not_if gem_path + ' list chef-rewind -i -v "' + rewind_version + '"'
-  action :nothing
-  environment ({ 'no_proxy' => URI.parse(get_binary_server_url).host })
-end.run_action(:run)
-
 require 'digest/sha2'
-require 'chef/rewind'
 require 'chef-vault'
 
 make_config('cobbler-web-user', 'cobbler')
@@ -164,14 +147,6 @@ dpkg_package deb_file_path
 include_recipe 'cobblerd::cobbler_source'
 include_recipe 'cobblerd::default'
 
-#
-# The cobblerd cookbook references the wrong service name. Upstream
-# cobbler packages use 'cobblerd' instead of 'cobbler'
-#
-rewind 'service[cobbler]' do
-  service_name 'cobblerd'
-end
-
 template '/etc/apache2/conf.d/cobbler.conf' do
   source 'cobbler/apache.conf.erb'
   mode 00644
@@ -191,7 +166,7 @@ end
 template '/etc/cobbler/settings' do
   source 'cobbler/settings.erb'
   mode 0644
-  notifies :restart, 'service[cobbler]', :immediately
+  notifies :restart, "service[#{node['cobbler']['service']['name']}]", :immediately
 end
 
 template '/etc/cobbler/dhcp.template' do
