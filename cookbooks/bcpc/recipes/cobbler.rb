@@ -63,8 +63,6 @@ end
 # The cobblerd cookbook relies on this attribute.
 node.force_default[:cobblerd][:web_password] = web_password
 
-bcpc_repo 'cobbler26'
-
 [
   'python',
   'apache2',
@@ -85,11 +83,6 @@ bcpc_repo 'cobbler26'
   package package_name do
     action :upgrade
   end
-end
-
-apt_package 'cobbler' do
-  action :install
-  version '2.6.11-1'
 end
 
 #
@@ -168,8 +161,8 @@ end
 
 dpkg_package deb_file_path
 
+include_recipe 'cobblerd::cobbler_source'
 include_recipe 'cobblerd::default'
-include_recipe 'cobblerd::web'
 
 #
 # The cobblerd cookbook references the wrong service name. Upstream
@@ -227,13 +220,6 @@ end
 link '/var/lib/tftpboot/chain.c32' do
   to '/usr/lib/syslinux/chain.c32'
   link_type :hard
-end
-
-cobbler_image 'ubuntu-12.04-mini' do
-  source "#{get_binary_server_url}/ubuntu-12.04-hwe313-mini.iso"
-  os_version 'precise'
-  os_breed 'ubuntu'
-  action :import
 end
 
 cobbler_image 'ubuntu-14.04-mini' do
