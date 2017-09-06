@@ -103,47 +103,6 @@ end
 
 package 'isc-dhcp-server'
 
-#
-# The cobblerd cookbook assumes we use the Ubuntu 'universe'
-# packages. Unlike "universe," the upstream packages include the
-# cobbler-web material in the main package, so we do not need the
-# second package.
-#
-# The "unwind" resource is no longer reliable under Chef 12.x, but
-# the replacement for unwind is not available under Chef 11.x.  Until
-# we can consilidate all nodes on 12.x, we're stuck doing this the
-# hard way with equivs.
-#
-package 'equivs'
-
-control_file_path =
-  ::File.join(Chef::Config.file_cache_path, 'cobbler-web.control')
-
-file control_file_path do
-  content <<-EOM.gsub(/^ {4}/,'')
-    Section: admin
-    Priority: optional
-    Standards-Version: 3.9.2
-
-    Package: cobbler-web
-    Version: 2.6.11-1
-    Maintainer: BACH <hadoop@bloomberg.net>
-    Architecture: all
-    Description: Dummy package to prevent the installation of cobbler-web
-  EOM
-end
-
-deb_file_path =
-   ::File.join(Chef::Config.file_cache_path,'cobbler-web_2.6.11-1_all.deb')
-
-execute 'cobbler-web-build' do
-   cwd ::File.dirname(deb_file_path)
-   command "equivs-build #{control_file_path}"
-   creates deb_file_path
-end
-
-dpkg_package deb_file_path
-
 include_recipe 'cobblerd::cobbler_source'
 include_recipe 'cobblerd::default'
 

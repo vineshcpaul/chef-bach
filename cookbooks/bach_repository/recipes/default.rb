@@ -36,5 +36,8 @@ include_recipe 'java::oracle_jce'
 # build jvmkill lib
 include_recipe 'bach_repository::jvmkill'
 
+# build jvmkill lib
+include_recipe 'cobblerd::cobbler_source_build'
+
 # Run after everything to fix perms.
 include_recipe 'bach_repository::permissions'
