@@ -103,7 +103,7 @@ end
 
 package 'isc-dhcp-server'
 
-include_recipe 'cobblerd::cobbler_source'
+include_recipe 'cobblerd::cobbler_source_install'
 include_recipe 'cobblerd::default'
 
 template '/etc/apache2/conf.d/cobbler.conf' do
@@ -165,7 +165,6 @@ end
 
 {
   trusty: 'ubuntu-14.04-mini-x86_64',
-  precise: 'ubuntu-12.04-mini-x86_64'
 }.each do |version, distro_name|
   cobbler_profile "bcpc_host_#{version}" do
     kickstart "cobbler/#{version}.preseed"
