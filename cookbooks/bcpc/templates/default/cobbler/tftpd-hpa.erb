@@ -1,0 +1,6 @@
+# /etc/default/tftpd-hpa
+
+TFTP_USERNAME="tftp"
+TFTP_DIRECTORY="/var/lib/tftpboot"
+TFTP_ADDRESS=":<%= node['bcpc']['tftpd']['port'] %>"
+TFTP_OPTIONS="--secure"

@@ -68,6 +68,13 @@ node.force_default[:cobblerd][:web_password] = web_password
   end
 end
 
+#xinetd is already running on port 69
+#so let's start tftpd-hpa on port 6900
+template '/etc/default/tftpd-hpa' do
+	source 'cobbler/tftpd-hpa.erb'
+	mode 0644
+end
+
 #
 # Cobbler 2.6 expects to drop off a tftp configuration in
 # /etc/xinetd.d, so we stop the independent tftp service ASAP.
