@@ -56,23 +56,16 @@ VBOX_DIR="`dirname ${BASH_SOURCE[0]}`/vbox"
 [[ -d $VBOX_DIR ]] || mkdir $VBOX_DIR
 P=`python -c "import os.path; print os.path.abspath(\"${VBOX_DIR}/\")"`
 
-# populate the VM_LIST array from cluster.txt
-# HACK: This is called prior to cluster.txt modification
-# we need to "manually" prepend BACH_CLUSTER_PREFIX to
-# all hostnames as we will generate VMs before cluster.txt
-# is edited
-if [ ${BACH_CLUSTER_PREFIX} == '']; then
-  export VM_LIST=( $(cut -f1 -d' ' ./cluster.txt) )
-else
-  vms=( $(cut -f1 -d' ' ./cluster.txt) )
-  VM_LIST=()
-  for old_vm in ${vms[*]}; do
-    VM_LIST+=( "${BACH_CLUSTER_PREFIX}-${old_vm}" )
-  done
-  echo "NEW VM LIST ${VM_LIST}"
-  export VM_LIST
-fi
-
+code_to_produce_vm_list="
+require './lib/cluster_data.rb';
+include BACH::ClusterData;
+cp=ENV.fetch('CLUSTER_PREFIX', '');
+cp += '-' unless cp.empty?;
+vms = parse_cluster_txt(File.readlines(File.join(
+  'stub-environment','${CLUSTER_TYPE,,}_cluster.txt')))
+puts vms.map{|e| cp + e[:hostname]}.join(' ')
+"
+VM_LIST=( $(ruby -e "$code_to_produce_vm_list") )
 ######################################################
 # Function to download files necessary for VM stand-up
 #
@@ -169,7 +162,12 @@ function create_cluster_VMs {
   # Gather VirtualBox networks in use by bootstrap VM
   oifs="$IFS"
   IFS=$'\n'
+<<<<<<< HEAD
   bootstrap_interfaces=($($VBM showvminfo ${BOOTSTRAP_NAME} \
+=======
+
+  bootstrap_interfaces=($($VBM showvminfo ${BACH_CLUSTER_PREFIX}bcpc-bootstrap \
+>>>>>>> Remove old IPXE disks
     --machinereadable | \
     egrep '^hostonlyadapter[0-9]=' | \
     sort | \
@@ -178,6 +176,15 @@ function create_cluster_VMs {
   VBN0="${bootstrap_interfaces[0]?Need a Virtualbox network 1 for the bootstrap}"
   VBN1="${bootstrap_interfaces[1]?Need a Virtualbox network 2 for the bootstrap}"
   VBN2="${bootstrap_interfaces[2]?Need a Virtualbox network 3 for the bootstrap}"
+
+  #
+  # Delete any old (or other clusters') IPXE disks to avoid collisions
+  #
+  old_ipxe=$($VBM list hdds | egrep '^Location:.*ipxe.vdi' | \
+             sed 's/Location:[ ]*//')
+  [ -n "$old_ipxe" ] && for disk in $old_ipxe; do
+    $VBM closemedium disk $disk --delete
+  done
 
   #
   # Add the ipxe USB key to the vbox storage registry as an immutable
