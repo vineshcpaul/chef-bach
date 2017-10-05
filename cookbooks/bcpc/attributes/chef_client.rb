@@ -71,6 +71,11 @@ default['chef_client']['config'].tap do |config|
       config['http_proxy'] = node[:bcpc][:bootstrap][:proxy]
       config['https_proxy'] = node[:bcpc][:bootstrap][:proxy]
       config['no_proxy'] = no_proxy_array.join(',')
+      # Halite throws the following error with no_lazy_load disabled
+      # RuntimeError: Halite is not compatible with no_lazy_load false, please set no_lazy_load true in your Chef configuration file.
+      # /var/chef/cache/cookbooks/poise/libraries/default.rb:17:in `<top (required)>'
+      # /usr/lib/ruby/vendor_ruby/chef/run_context/cookbook_compiler.rb:179:in `load'
+      config['no_lazy_load'] = true
     end
   end    
 end
