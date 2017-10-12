@@ -162,12 +162,8 @@ function create_cluster_VMs {
   # Gather VirtualBox networks in use by bootstrap VM
   oifs="$IFS"
   IFS=$'\n'
-<<<<<<< HEAD
-  bootstrap_interfaces=($($VBM showvminfo ${BOOTSTRAP_NAME} \
-=======
 
-  bootstrap_interfaces=($($VBM showvminfo ${BACH_CLUSTER_PREFIX}bcpc-bootstrap \
->>>>>>> Remove old IPXE disks
+  bootstrap_interfaces=($($VBM showvminfo ${BACH_CLUSTER_PREFIX}-bcpc-bootstrap \
     --machinereadable | \
     egrep '^hostonlyadapter[0-9]=' | \
     sort | \
