@@ -174,21 +174,21 @@ function create_cluster_VMs {
   VBN2="${bootstrap_interfaces[2]?Need a Virtualbox network 3 for the bootstrap}"
 
   #
-  # Delete any old (or other clusters') IPXE disks to avoid collisions
-  #
-  old_ipxe=$($VBM list hdds | egrep '^Location:.*ipxe.vdi' | \
-             sed 's/Location:[ ]*//')
-  [ -n "$old_ipxe" ] && for disk in $old_ipxe; do
-    $VBM closemedium disk $disk --delete
-  done
-
-  #
   # Add the ipxe USB key to the vbox storage registry as an immutable
   # disk, so we can share it between several VMs.
   #
-  IPXE_DISK=$P/ipxe.vdi
-  cp files/default/ipxe.vdi $IPXE_DISK
-  $VBM modifyhd -type immutable $IPXE_DISK
+  current_ipxe=$(vboxmanage list hdds | egrep '^Location:.*ipxe.vdi$')
+  if [[ -n "$current_ipxe=" ]]; then
+    ipxe_location=$(echo "$current_ipxe" | sed 's/^Location:[ ]*//')
+  else
+    ipxe_location=$P/ipxe.vdi
+    cp files/default/ipxe.vdi $ipxe_location
+    $VBM modifyhd -type immutable $ipxe_location
+  fi
+
+  # provide the IPXE disk location so we know if it is from
+  # another cluster
+  echo "NOTE: Using IPXE volume at: $ipxe_location"
 
   # Create each VM
   for vm in ${VM_LIST[*]}; do
@@ -230,7 +230,7 @@ function create_cluster_VMs {
 	  if [[ $CLUSTER_VM_EFI == true ]]; then
 	      # Attach the iPXE boot medium as /dev/sdb.
               $VBM storageattach $vm --storagectl $DISK_CONTROLLER \
-		   --device 0 --port $port --type hdd --medium $IPXE_DISK
+		   --device 0 --port $port --type hdd --medium $ipxe_location
 	      port=$((port+1))
 	  else
 	      # If we're not using EFI, force the BIOS to boot net.
