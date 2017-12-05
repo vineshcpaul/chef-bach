@@ -162,8 +162,11 @@ function create_cluster_VMs {
   # Gather VirtualBox networks in use by bootstrap VM
   oifs="$IFS"
   IFS=$'\n'
-
-  bootstrap_interfaces=($($VBM showvminfo ${BACH_CLUSTER_PREFIX}-bcpc-bootstrap \
+  BOOTSTRAP_NAME="bcpc-bootstrap"
+  if [ -n "${BACH_CLUSTER_PREFIX}" ]; then
+   BOOTSTRAP_NAME="${BACH_CLUSTER_PREFIX}-bcpc-bootstrap"
+  fi
+  bootstrap_interfaces=($($VBM showvminfo ${BOOTSTRAP_NAME} \
     --machinereadable | \
     egrep '^hostonlyadapter[0-9]=' | \
     sort | \
