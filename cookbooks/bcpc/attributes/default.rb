@@ -167,6 +167,14 @@ default['bcpc']['repos_for']['trusty'].tap do |trusty_repos|
       'http://private-repo-1.hortonworks.com/HDP/ubuntu14/2.x/updates/2.6.3.22-1'
   end
 
+  trusty_repos['hortonworks-gpl'].tap do |repo|
+    repo[:components] = ['main']
+    repo[:distribution] = 'HDP-GPL'
+    repo[:key] = 'hortonworks.key'
+    repo[:uri] =
+      'http://s3.amazonaws.com/dev.hortonworks.com/HDP-GPL/ubuntu14/2.x/BUILDS/2.6.4.0-91'
+  end
+
   trusty_repos['hdp-utils'].tap do |repo|
     repo[:components] = ['main']
     repo[:distribution] = 'HDP-UTILS'
